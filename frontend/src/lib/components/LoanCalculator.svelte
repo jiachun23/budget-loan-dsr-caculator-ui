@@ -10,10 +10,19 @@
   // Form state
   let totalAmount = $state(500000);
   let downpayment = $state(100000);
+  let downpaymentPercentage = $state(20); // Default 20%
+  let downpaymentMode = $state<'amount' | 'percentage'>('amount');
   let interest = $state(3.5);
   let years = $state(30);
   let monthlyBudget = $state<number | undefined>(undefined);
   let useBudget = $state(false);
+  
+  // Derived downpayment value based on mode
+  $effect(() => {
+    if (downpaymentMode === 'percentage') {
+      downpayment = Math.round(totalAmount * (downpaymentPercentage / 100));
+    }
+  });
   
   // Results
   let result = $state<CalculateResponse | null>(null);
@@ -57,6 +66,8 @@
   function resetForm() {
     totalAmount = 500000;
     downpayment = 100000;
+    downpaymentPercentage = 20;
+    downpaymentMode = 'amount';
     interest = 3.5;
     years = 30;
     monthlyBudget = undefined;
@@ -85,16 +96,52 @@
     </div>
     
     <div>
-      <label for="downpayment" class="block text-sm font-medium text-gray-700 mb-1">
-        Downpayment (RM)
-      </label>
-      <input
-        type="number"
-        id="downpayment"
-        bind:value={downpayment}
-        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-        placeholder="100000"
-      />
+      <div class="flex items-center justify-between mb-1">
+        <label for="downpayment" class="block text-sm font-medium text-gray-700">
+          Downpayment
+        </label>
+        <div class="flex rounded-lg overflow-hidden border border-gray-300">
+          <button
+            type="button"
+            onclick={() => downpaymentMode = 'amount'}
+            class="px-3 py-1 text-xs font-medium transition-colors {downpaymentMode === 'amount' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+          >
+            Amount
+          </button>
+          <button
+            type="button"
+            onclick={() => downpaymentMode = 'percentage'}
+            class="px-3 py-1 text-xs font-medium transition-colors border-l border-gray-300 {downpaymentMode === 'percentage' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}"
+          >
+            Percentage
+          </button>
+        </div>
+      </div>
+      
+      {#if downpaymentMode === 'amount'}
+        <input
+          type="number"
+          id="downpayment"
+          bind:value={downpayment}
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          placeholder="100000"
+        />
+      {:else}
+        <div class="flex items-center gap-2">
+          <input
+            type="number"
+            id="downpaymentPercentage"
+            step="0.1"
+            bind:value={downpaymentPercentage}
+            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            placeholder="20"
+          />
+          <span class="text-gray-500 font-medium">%</span>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">
+          = RM {downpayment.toLocaleString()} ({downpaymentPercentage}% of RM {totalAmount.toLocaleString()})
+        </p>
+      {/if}
     </div>
     
     <div>

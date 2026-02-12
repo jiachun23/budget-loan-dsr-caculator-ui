@@ -11,7 +11,7 @@
   let { monthlyInstalment = 0 }: Props = $props();
   
   // Form state
-  let instalment = $state(monthlyInstalment);
+  let instalment = $state(0);
   let grossIncome = $state(8000);
   let netIncome = $state<number | undefined>(undefined);
   let includeNetIncome = $state(false);

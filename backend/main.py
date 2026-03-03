@@ -21,6 +21,7 @@ class CalculateRequest(BaseModel):
     downpayment: float
     interest: float
     years: int
+    loan_type: str = "property"  # "car" or "property"
     monthly_budget: Optional[float] = None
 
 class ExpenseItem(BaseModel):
@@ -57,6 +58,7 @@ class CalculateResponse(BaseModel):
     loan_amount: float
     loan_period: str
     monthly_instalment: float
+    loan_type: str  # "car" or "property"
     budget_comparison: Optional[BudgetComparison] = None
 
 class DSRResponse(BaseModel):
@@ -67,13 +69,30 @@ class DSRResponse(BaseModel):
     expense_breakdown: dict
 
 # Test endpoint
-@app.get("/test")
+@app.get("/health-test")
 async def test():
     return "ok"
 
-# Calculate monthly instalment
-def calculate_monthly_instalment(loan_amount: float, interest_rate: float, years: int) -> float:
+# Calculate flat rate monthly instalment (for car loans)
+def calculate_flat_rate_instalment(loan_amount: float, interest_rate: float, years: int) -> float:
     return (loan_amount * interest_rate * years + loan_amount) / (years * 12)
+
+# Calculate amortized monthly instalment (for property loans)
+def calculate_amortized_instalment(loan_amount: float, interest_rate: float, years: int) -> float:
+    if interest_rate == 0:
+        return loan_amount / (years * 12)
+    
+    monthly_rate = interest_rate / 12
+    num_payments = years * 12
+    
+    return (loan_amount * monthly_rate * math.pow(1 + monthly_rate, num_payments)) / (math.pow(1 + monthly_rate, num_payments) - 1)
+
+# Wrapper to select calculation method
+def calculate_instalment(loan_amount: float, interest_rate: float, years: int, loan_type: str = "property") -> float:
+    if loan_type == "car":
+        return calculate_flat_rate_instalment(loan_amount, interest_rate, years)
+    else:
+        return calculate_amortized_instalment(loan_amount, interest_rate, years)
 
 # Generate budget suggestions
 def generate_budget_suggestions(
@@ -82,16 +101,17 @@ def generate_budget_suggestions(
     interest: float,
     years: int,
     budget: float,
-    current_monthly: float
+    current_monthly: float,
+    loan_type: str = "property"
 ) -> List[Suggestion]:
     suggestions = []
     loan_amount = total_amount - downpayment
     interest_rate = interest / 100
     
     # Suggestion 1: Extend loan term
-    max_years = 35  # Maximum typical loan term
+    max_years = 35 if loan_type == "property" else 9  # Maximum typical loan term
     for test_years in range(years + 1, max_years + 1):
-        test_monthly = calculate_monthly_instalment(loan_amount, interest_rate, test_years)
+        test_monthly = calculate_instalment(loan_amount, interest_rate, test_years, loan_type)
         if test_monthly <= budget:
             suggestions.append(Suggestion(
                 type="extend_term",
@@ -103,14 +123,29 @@ def generate_budget_suggestions(
     
     # Suggestion 2: Increase downpayment
     # Calculate required loan amount for budget
-    # monthly = (loan * rate * years + loan) / (years * 12)
-    # budget * years * 12 = loan * (rate * years + 1)
-    # loan = budget * years * 12 / (rate * years + 1)
-    required_loan = budget * years * 12 / (interest_rate * years + 1)
+    # Calculate required loan amount for budget
+    required_loan = 0
+    
+    if loan_type == "car":
+        # Flat rate formula reverse
+        # monthly = (loan * rate * years + loan) / (years * 12)
+        # budget * years * 12 = loan * (rate * years + 1)
+        # loan = budget * years * 12 / (rate * years + 1)
+        required_loan = budget * years * 12 / (interest_rate * years + 1)
+    else:
+        # Amortization formula reverse
+        # P = M * ( (1+r)^n - 1 ) / ( r * (1+r)^n )
+        if interest_rate == 0:
+            required_loan = budget * years * 12
+        else:
+            monthly_rate = interest_rate / 12
+            num_payments = years * 12
+            required_loan = budget * (math.pow(1 + monthly_rate, num_payments) - 1) / (monthly_rate * math.pow(1 + monthly_rate, num_payments))
+            
     additional_downpayment = loan_amount - required_loan
     
     if additional_downpayment > 0 and downpayment + additional_downpayment < total_amount:
-        new_monthly = calculate_monthly_instalment(required_loan, interest_rate, years)
+        new_monthly = calculate_instalment(required_loan, interest_rate, years, loan_type)
         suggestions.append(Suggestion(
             type="increase_downpayment",
             message=f"Increase downpayment by RM {additional_downpayment:,.2f} to meet your budget",
@@ -126,7 +161,7 @@ def generate_budget_suggestions(
     
     if required_total > 0 and required_total < total_amount:
         new_loan = required_total - (required_total * downpayment_percent)
-        new_monthly = calculate_monthly_instalment(new_loan, interest_rate, years)
+        new_monthly = calculate_instalment(new_loan, interest_rate, years, loan_type)
         suggestions.append(Suggestion(
             type="reduce_price",
             message=f"Consider a property priced at RM {required_total:,.2f} to meet your budget",
@@ -137,14 +172,14 @@ def generate_budget_suggestions(
     return suggestions
 
 # Endpoint to perform loan calculation
-@app.post("/calculate", response_model=CalculateResponse)
+@app.post("/api/calculate", response_model=CalculateResponse)
 async def calculate(data: CalculateRequest):
     downpayment_percent = (data.downpayment / data.total_amount) * 100
     interest_rate = data.interest / 100
     loan_amount = data.total_amount - data.downpayment
     years = data.years
 
-    monthly_instalment = calculate_monthly_instalment(loan_amount, interest_rate, years)
+    monthly_instalment = calculate_instalment(loan_amount, interest_rate, years, data.loan_type)
 
     response = CalculateResponse(
         downpayment=round(data.downpayment, 2),
@@ -152,7 +187,8 @@ async def calculate(data: CalculateRequest):
         interest_rate=f"{data.interest} %",
         loan_amount=round(loan_amount, 2),
         loan_period=f"{years} years",
-        monthly_instalment=round(monthly_instalment, 2)
+        monthly_instalment=round(monthly_instalment, 2),
+        loan_type=data.loan_type
     )
 
     # Add budget comparison if budget is provided
@@ -168,7 +204,8 @@ async def calculate(data: CalculateRequest):
                 data.interest,
                 data.years,
                 data.monthly_budget,
-                monthly_instalment
+                monthly_instalment,
+                data.loan_type
             )
         
         response.budget_comparison = BudgetComparison(
@@ -182,7 +219,7 @@ async def calculate(data: CalculateRequest):
     return response
 
 # Endpoint to calculate DSR
-@app.post("/dsr", response_model=DSRResponse)
+@app.post("/api/dsr", response_model=DSRResponse)
 async def calculate_dsr(data: DSRRequest):
     # Calculate total expenses
     total_expenses = sum(expense.amount for expense in data.expenses)

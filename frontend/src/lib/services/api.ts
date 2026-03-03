@@ -5,6 +5,7 @@ export interface CalculateRequest {
   downpayment: number;
   interest: number;
   years: number;
+  loan_type: 'car' | 'property';
   monthly_budget?: number;
 }
 
@@ -33,6 +34,7 @@ export interface CalculateResponse {
   loan_amount: number;
   loan_period: string;
   monthly_instalment: number;
+  loan_type: string;
   budget_comparison?: BudgetComparison;
 }
 

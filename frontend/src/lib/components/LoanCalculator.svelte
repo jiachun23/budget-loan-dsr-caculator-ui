@@ -8,6 +8,7 @@
   let { onCalculated }: Props = $props();
   
   // Form state
+  let loanType = $state<'property' | 'car'>('property');
   let totalAmount = $state(500000);
   let downpayment = $state(100000);
   let downpaymentPercentage = $state(20); // Default 20%
@@ -24,6 +25,19 @@
     }
   });
   
+  // Default values based on loan type
+  $effect(() => {
+    if (loanType === 'car') {
+      // Defaults for car loan
+      if (years > 9) years = 9;
+      if (interest < 2.0) interest = 3.0;
+    } else {
+      // Defaults for property loan
+      if (years < 10) years = 30;
+      if (interest > 4.0) interest = 3.5;
+    }
+  });
+
   // Results
   let result = $state<CalculateResponse | null>(null);
   let loading = $state(false);
@@ -39,6 +53,7 @@
         downpayment: downpayment,
         interest: interest,
         years: years,
+        loan_type: loanType,
         monthly_budget: useBudget ? monthlyBudget : undefined
       };
       
@@ -64,6 +79,7 @@
   }
   
   function resetForm() {
+    loanType = 'property';
     totalAmount = 500000;
     downpayment = 100000;
     downpaymentPercentage = 20;
@@ -82,16 +98,43 @@
   
   <!-- Input Form -->
   <div class="space-y-4">
+    <!-- Loan Type Selection -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Loan Type</label>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="radio"
+            name="loanType"
+            value="property"
+            bind:group={loanType}
+            class="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+          />
+          <span class="text-gray-700">Property Loan</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input
+            type="radio"
+            name="loanType"
+            value="car"
+            bind:group={loanType}
+            class="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+          />
+          <span class="text-gray-700">Car Loan</span>
+        </label>
+      </div>
+    </div>
+
     <div>
       <label for="totalAmount" class="block text-sm font-medium text-gray-700 mb-1">
-        Property/Car Price (RM)
+        {loanType === 'property' ? 'Property' : 'Car'} Price (RM)
       </label>
       <input
         type="number"
         id="totalAmount"
         bind:value={totalAmount}
         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-        placeholder="500000"
+        placeholder={loanType === 'property' ? '500000' : '80000'}
       />
     </div>
     
@@ -248,8 +291,17 @@
       </div>
       
       <div class="mt-4 bg-primary-50 p-4 rounded-lg border border-primary-200">
-        <p class="text-sm text-primary-600">Monthly Instalment</p>
-        <p class="text-2xl font-bold text-primary-700">{formatCurrency(result.monthly_instalment)}</p>
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-sm text-primary-600">Monthly Instalment</p>
+            <p class="text-2xl font-bold text-primary-700">{formatCurrency(result.monthly_instalment)}</p>
+          </div>
+          <div class="text-right">
+            <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full {result.loan_type === 'car' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">
+              {result.loan_type === 'car' ? 'Fixed Rate (Car)' : 'Amortized (Property)'}
+            </span>
+          </div>
+        </div>
       </div>
       
       <!-- Budget Comparison -->

@@ -1,23 +1,14 @@
 {
   "version": 2,
-  "builds": [
+  "rewrites": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/sveltekit"
-    },
-    {
-      "src": "backend/main.py",
-      "use": "@vercel/python"
+      "source": "/api/:path*",
+      "destination": "backend/main.py"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "backend/main.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
+  "functions": {
+    "backend/main.py": {
+      "runtime": "@vercel/python"
     }
-  ]
+  }
 }

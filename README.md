@@ -1,11 +1,13 @@
 # Loan Calculator & DSR App
 
-A full-stack web application for calculating loan payments and assessing Debt Service Ratio (DSR).
+A web application for calculating loan payments and assessing Debt Service
+Ratio (DSR). Runs **entirely in the browser** — no backend or server required.
 
 ## Features
 
 ### Loan Calculator
 - Calculate monthly instalment based on property/car price, downpayment, interest rate, and loan period
+- Property loans use the amortized formula; car loans use a flat-rate formula
 - Optional budget comparison feature
 - Smart suggestions when over budget (extend term, increase downpayment, reduce price)
 
@@ -17,47 +19,37 @@ A full-stack web application for calculating loan payments and assessing Debt Se
 
 ## Tech Stack
 
-- **Frontend**: SvelteKit + TypeScript + TailwindCSS + Chart.js
-- **Backend**: FastAPI + Python 3.11
-- **Deployment**: Vercel (monorepo)
+- **Framework**: SvelteKit (Svelte 5) + TypeScript
+- **Styling**: TailwindCSS
+- **Charts**: Chart.js
+- **Build**: `@sveltejs/adapter-static` (prerendered static site)
+
+All calculation logic runs client-side in TypeScript
+(`frontend/src/lib/services/calculations.ts`). This was previously a
+Python/FastAPI backend and has been ported into the frontend.
 
 ## Project Structure
 
 ```
 loan-calc/
-├── frontend/           # SvelteKit application
-│   ├── src/
-│   │   ├── lib/
-│   │   │   ├── components/
-│   │   │   ├── services/
-│   │   │   └── utils/
-│   │   └── routes/
-│   └── ...
-├── backend/            # FastAPI application
-│   ├── main.py
-│   ├── requirements.txt
-│   └── vercel.json
-└── vercel.json         # Root deployment config
+├── CLAUDE.md
+├── README.md
+└── frontend/              # the entire SvelteKit application
+    └── src/
+        ├── routes/        # +page.svelte (UI), +layout.ts (prerender config)
+        └── lib/
+            ├── components/ # LoanCalculator, DSRCalculator, ExpenseItem, PieChart
+            ├── services/   # api.ts (public API), calculations.ts (the math)
+            └── utils/      # categories.ts
 ```
 
 ## Local Development
 
 ### Prerequisites
 - Node.js 18+
-- Python 3.11+
-- npm or yarn
+- npm
 
-### Setup Backend
-
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-### Setup Frontend
+### Setup
 
 ```bash
 cd frontend
@@ -65,71 +57,28 @@ npm install
 npm run dev
 ```
 
-The frontend will run on `http://localhost:5173` and will proxy API requests to the backend.
+The app runs on `http://localhost:5173`.
 
-## Deploy to Vercel
+## Build & Deploy
 
-### Option 1: Vercel CLI
-
-1. Install Vercel CLI:
-   ```bash
-   npm install -g vercel
-   ```
-
-2. Login to Vercel:
-   ```bash
-   vercel login
-   ```
-
-3. Deploy:
-   ```bash
-   vercel
-   ```
-
-### Option 2: GitHub Integration
-
-1. Push this repository to GitHub
-2. Go to [vercel.com](https://vercel.com) and import your repository
-3. Vercel will automatically detect the monorepo structure and deploy both frontend and backend
-
-## API Endpoints
-
-### POST /api/calculate
-Calculate loan instalment and optional budget comparison.
-
-**Request:**
-```json
-{
-  "total_amount": 500000,
-  "downpayment": 100000,
-  "interest": 3.5,
-  "years": 30,
-  "monthly_budget": 1500
-}
+```bash
+cd frontend
+npm run build      # static output in frontend/build/
+npm run preview    # preview the production build locally
 ```
 
-### POST /api/dsr
-Calculate Debt Service Ratio.
-
-**Request:**
-```json
-{
-  "monthly_instalment": 1944.44,
-  "gross_income": 8000,
-  "expenses": [
-    {"category": "Housing", "name": "Rent", "amount": 1500}
-  ]
-}
-```
+The contents of `frontend/build/` can be hosted on any static host (Vercel,
+Netlify, GitHub Pages, S3, etc.). On Vercel, set the project **Root Directory**
+to `frontend`.
 
 ## DSR Thresholds
 
-| Status | DSR Range |
-|--------|-----------|
-| Healthy | ≤ 30% |
-| Medium | 30% - 50% |
-| Caution | 50% - 70% |
-| High Risk | > 70% |
+| Status    | DSR Range  |
+|-----------|------------|
+| Healthy   | ≤ 30%      |
+| Medium    | 30% - 50%  |
+| Caution   | 50% - 70%  |
+| High Risk | > 70%      |
 
 ## License
 

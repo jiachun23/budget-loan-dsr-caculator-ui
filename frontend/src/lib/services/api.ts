@@ -1,4 +1,13 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'https://budget-loan-dsr-caculator-ui.onrender.com/api';
+/**
+ * Public API for loan & DSR calculations.
+ *
+ * These functions used to call a remote Python/FastAPI backend over HTTP.
+ * The logic now runs entirely in the browser (see ./calculations.ts), so no
+ * network request or server is required. The async signatures are kept so
+ * existing callers (`await calculateLoan(...)`) continue to work unchanged.
+ */
+
+import { calculate, calculateDsr } from './calculations';
 
 export interface CalculateRequest {
   total_amount: number;
@@ -60,33 +69,9 @@ export interface DSRResponse {
 }
 
 export async function calculateLoan(data: CalculateRequest): Promise<CalculateResponse> {
-  const response = await fetch(`${API_BASE}/calculate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  return response.json();
+  return calculate(data);
 }
 
 export async function calculateDSR(data: DSRRequest): Promise<DSRResponse> {
-  const response = await fetch(`${API_BASE}/dsr`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-
-  return response.json();
+  return calculateDsr(data);
 }
